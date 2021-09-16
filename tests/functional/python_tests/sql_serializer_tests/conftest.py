@@ -16,8 +16,8 @@ def world_with_witnesses():
     with World(directory=context.get_current_directory()) as world:
         world.set_clean_up_policy(constants.WorldCleanUpPolicy.REMOVE_ONLY_UNNEEDED_FILES)
 
-        alpha_witness_names = [f'witness{i}-alpha' for i in range(10)]
-        beta_witness_names = [f'witness{i}-beta' for i in range(10)]
+        alpha_witness_names = [f'witness{i}-alpha' for i in range(11)]
+        beta_witness_names = [f'witness{i}-beta' for i in range(9)]
         all_witness_names = alpha_witness_names + beta_witness_names
 
         # Create first network
@@ -25,16 +25,15 @@ def world_with_witnesses():
         init_node = alpha_net.create_init_node()
         alpha_net.create_witness_node(witnesses=[f'witness{i}-alpha' for i in range(0, 3)])
         alpha_net.create_witness_node(witnesses=[f'witness{i}-alpha' for i in range(3, 6)])
-        alpha_net.create_witness_node(witnesses=[f'witness{i}-alpha' for i in range(6, 8)])
-        alpha_net.create_witness_node(witnesses=[f'witness{i}-alpha' for i in range(8, 10)])
+        alpha_net.create_witness_node(witnesses=[f'witness{i}-alpha' for i in range(6, 9)])
+        alpha_net.create_witness_node(witnesses=[f'witness{i}-alpha' for i in range(9, 11)])
         api_node = alpha_net.create_api_node()
 
         # Create second network
         beta_net = world.create_network('Beta')
         beta_net.create_witness_node(witnesses=[f'witness{i}-beta' for i in range(0, 3)])
         beta_net.create_witness_node(witnesses=[f'witness{i}-beta' for i in range(3, 6)])
-        beta_net.create_witness_node(witnesses=[f'witness{i}-beta' for i in range(6, 8)])
-        beta_net.create_witness_node(witnesses=[f'witness{i}-beta' for i in range(8, 10)])
+        beta_net.create_witness_node(witnesses=[f'witness{i}-beta' for i in range(6, 9)])
         node_under_test = beta_net.create_api_node('NodeUnderTest')
         node_under_test.config.plugin.append('sql_serializer')
         node_under_test.config.psql_url = 'postgresql://myuser:mypassword@localhost/haf_block_log'

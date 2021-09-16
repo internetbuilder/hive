@@ -6,7 +6,7 @@ import sqlalchemy
 FIRST_BLOCK_TIMESTAMP = int(time.time()) - 200 * 3
 BLOCKS_IN_FORK = 10
 BACK_FROM_FORK_BLOCKS = 10
-FORKS = 500
+FORKS = 5_000_000
 
 
 def test_blocks_table_after_fork(world_with_witnesses):
