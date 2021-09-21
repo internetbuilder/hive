@@ -33,6 +33,7 @@
 #include <fc/io/stdio.hpp>
 #include <fc/network/http/server.hpp>
 #include <fc/network/http/websocket.hpp>
+#include <fc/network/url.hpp>
 #include <fc/rpc/cli.hpp>
 #include <fc/rpc/http_api.hpp>
 #include <fc/rpc/websocket_api.hpp>
@@ -166,15 +167,23 @@ int main( int argc, char** argv )
     if( !options.at("server-rpc-endpoint").defaulted() )
       wdata.ws_server = options.at("server-rpc-endpoint").as<std::string>();
 
-    fc::http::websocket_client client( options["cert-authority"].as<std::string>() );
+    // XXX: Just for testing purposes. Change before MR:
+    // fc::http::websocket_client client( options["cert-authority"].as<std::string>() );
+    fc::http::connection client;
     idump((wdata.ws_server));
-    fc::http::websocket_connection_ptr con;
+    // fc::http::websocket_connection_ptr con;
+    fc::http::connection_ptr con;
+
+    fc::url server{ wdata.ws_server };
 
     for (;;)
     {
       try
       {
-        con = client.connect( wdata.ws_server );
+        // con = client.connect( server.operator std::string() );
+        uint16_t port = 80;
+        if( server.port().valid() ) port = *server.port();
+        con = client.connect_to( fc::ip::endpoint{ *server.host(), port } );
       }
       catch (const fc::exception& e)
       {
@@ -190,10 +199,10 @@ int main( int argc, char** argv )
       }
     }
 
-
     auto wallet_cli = std::make_shared<fc::rpc::cli>();
 
-    auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
+    auto apic = std::make_shared< fc::rpc::http_api_connection>(*con);
+    // auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
     auto remote_api = apic->get_remote_api< hive::plugins::wallet_bridge_api::wallet_bridge_api >(0, "wallet_bridge_api");
     auto wapiptr = std::make_shared<wallet_api>( wdata, _hive_chain_id, remote_api, wallet_cli );
     wapiptr->set_wallet_filename( wallet_file.generic_string() );
@@ -276,10 +285,12 @@ int main( int argc, char** argv )
             resp.set_status( fc::http::reply::NotAuthorized );
             return;
           }
-          std::shared_ptr< fc::rpc::http_api_connection > conn =
-            std::make_shared< fc::rpc::http_api_connection>();
-          conn->register_api( wapi );
-          conn->on_request( req, resp );
+          _http_server->on_connection([&]( const fc::http::connection_ptr& c ){
+            std::shared_ptr< fc::rpc::http_api_connection > conn =
+              std::make_shared< fc::rpc::http_api_connection>(*c);
+            conn->register_api( wapi );
+            conn->on_request( req, resp );
+          });
         } );
     }
 
