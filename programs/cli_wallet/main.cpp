@@ -169,7 +169,7 @@ int main( int argc, char** argv )
 
     // XXX: Just for testing purposes. Change before MR:
     // fc::http::websocket_client client( options["cert-authority"].as<std::string>() );
-    fc::http::connection client;
+    fc::http::client client;
     idump((wdata.ws_server));
     // fc::http::websocket_connection_ptr con;
     fc::http::connection_ptr con;
@@ -183,7 +183,7 @@ int main( int argc, char** argv )
         // con = client.connect( server.operator std::string() );
         uint16_t port = 80;
         if( server.port().valid() ) port = *server.port();
-        con = client.connect_to( fc::ip::endpoint{ *server.host(), port } );
+        con = client.connect( fc::ip::endpoint{ *server.host(), port } );
       }
       catch (const fc::exception& e)
       {
