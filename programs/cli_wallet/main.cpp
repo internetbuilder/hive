@@ -36,7 +36,6 @@
 #include <fc/network/url.hpp>
 #include <fc/rpc/cli.hpp>
 #include <fc/rpc/http_api.hpp>
-#include <fc/rpc/websocket_api.hpp>
 #include <fc/smart_ref_impl.hpp>
 
 #include <hive/utilities/key_conversion.hpp>
@@ -66,6 +65,25 @@ using namespace hive::chain;
 using namespace hive::wallet;
 using namespace std;
 namespace bpo = boost::program_options;
+
+namespace
+{
+  std::shared_ptr< fc::http::client > get_client_type( const std::string& _url_str, const std::string& server_auth )
+  {
+    fc::url _url{ url_str };
+
+    if( _url.proto() == "ws" )
+      return std::make_shared< fc::http::websocket_client >();
+    else if( _url.proto() == "wss" )
+      return std::make_shared< fc::http::websocket_tls_client >( server_auth );
+    else if( _url.proto() == "http" )
+      return std::make_shared< fc::http::http_client >();
+    else if( _url.proto() == "https" )
+      return std::make_shared< fc::http::http_tls_client >( server_auth );
+    else
+      FC_ASSERT( false, "Unsupported protocol: ${proto}", ("proto", _url.proto()) );
+  }
+}
 
 int main( int argc, char** argv )
 {
@@ -167,11 +185,8 @@ int main( int argc, char** argv )
     if( !options.at("server-rpc-endpoint").defaulted() )
       wdata.ws_server = options.at("server-rpc-endpoint").as<std::string>();
 
-    // XXX: Just for testing purposes. Change before MR:
-    // fc::http::websocket_client client( options["cert-authority"].as<std::string>() );
-    fc::http::client client;
+    auto client = get_client_type( wdata.ws_server, options["cert-authority"].as<std::string>() );
     idump((wdata.ws_server));
-    // fc::http::connection_ptr con;
     fc::http::connection_ptr con;
 
     fc::url server{ wdata.ws_server };
@@ -180,10 +195,7 @@ int main( int argc, char** argv )
     {
       try
       {
-        // con = client.connect( server.operator std::string() );
-        uint16_t port = 80;
-        if( server.port().valid() ) port = *server.port();
-        con = client.connect( fc::ip::endpoint{ *server.host(), port } );
+        con = client->connect( wdata.ws_server );
       }
       catch (const fc::exception& e)
       {
@@ -201,8 +213,7 @@ int main( int argc, char** argv )
 
     auto wallet_cli = std::make_shared<fc::rpc::cli>();
 
-    auto apic = std::make_shared< fc::rpc::http_api_connection>(*con);
-    // auto apic = std::make_shared<fc::rpc::websocket_api_connection>(*con);
+    auto apic = std::make_shared< fc::rpc::api_connection>(*con);
     auto remote_api = apic->get_remote_api< hive::plugins::wallet_bridge_api::wallet_bridge_api >(0, "wallet_bridge_api");
     auto wapiptr = std::make_shared<wallet_api>( wdata, _hive_chain_id, remote_api, wallet_cli );
     wapiptr->set_wallet_filename( wallet_file.generic_string() );
@@ -236,7 +247,7 @@ int main( int argc, char** argv )
       _websocket_server->on_connection([&]( const fc::http::connection_ptr& c ){
         std::cout << "here... \n";
         wlog("." );
-        auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c);
+        auto wsc = std::make_shared<fc::rpc::http_api_connection>(*c);
         wsc->register_api(wapi);
         c->set_session_data( wsc );
       });
@@ -253,7 +264,7 @@ int main( int argc, char** argv )
     if( options.count("rpc-tls-endpoint") )
     {
       _websocket_tls_server->on_connection([&]( const fc::http::connection_ptr& c ){
-        auto wsc = std::make_shared<fc::rpc::websocket_api_connection>(*c);
+        auto wsc = std::make_shared<fc::rpc::http_api_connection>(*c);
         wsc->register_api(wapi);
         c->set_session_data( wsc );
       });
@@ -264,7 +275,7 @@ int main( int argc, char** argv )
 
     set<fc::ip::address> allowed_ip_set;
 
-    auto _http_server = std::make_shared<fc::http::server>();
+    auto _http_server = std::make_shared<fc::http::http_server>();
     if( options.count("rpc-http-endpoint" ) )
     {
       for( const auto& ip : allowed_ips )
@@ -277,7 +288,7 @@ int main( int argc, char** argv )
       // due to implementation, on_request() must come AFTER listen()
       //
       _http_server->on_request(
-        [&]( const fc::http::request& req, const fc::http::server::response& resp )
+        [&]( const fc::http::request& req, const fc::http::response& resp )
         {
           if( allowed_ip_set.find( fc::ip::endpoint::from_string(req.remote_endpoint).get_address() ) == allowed_ip_set.end() &&
               allowed_ip_set.find( fc::ip::address() ) == allowed_ip_set.end() ) {
