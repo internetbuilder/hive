@@ -68,7 +68,7 @@ namespace bpo = boost::program_options;
 
 namespace
 {
-  std::shared_ptr< fc::http::client > get_client_type( const std::string& _url_str, const std::string& server_auth )
+  std::shared_ptr< fc::http::client > get_client_type( const std::string& _url_str, const std::string& server_auth = std::string{} )
   {
     fc::url _url{ _url_str };
 
