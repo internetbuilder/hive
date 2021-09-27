@@ -31,7 +31,7 @@
 
 #include <fc/io/json.hpp>
 #include <fc/io/stdio.hpp>
-#include <fc/network/http/server.hpp>
+#include <fc/network/http/http.hpp>
 #include <fc/network/http/websocket.hpp>
 #include <fc/network/url.hpp>
 #include <fc/rpc/cli.hpp>
@@ -70,7 +70,7 @@ namespace
 {
   std::shared_ptr< fc::http::client > get_client_type( const std::string& _url_str, const std::string& server_auth )
   {
-    fc::url _url{ url_str };
+    fc::url _url{ _url_str };
 
     if( _url.proto() == "ws" )
       return std::make_shared< fc::http::websocket_client >();
@@ -213,7 +213,7 @@ int main( int argc, char** argv )
 
     auto wallet_cli = std::make_shared<fc::rpc::cli>();
 
-    auto apic = std::make_shared< fc::rpc::api_connection>(*con);
+    auto apic = std::make_shared< fc::rpc::http_api_connection >(*con);
     auto remote_api = apic->get_remote_api< hive::plugins::wallet_bridge_api::wallet_bridge_api >(0, "wallet_bridge_api");
     auto wapiptr = std::make_shared<wallet_api>( wdata, _hive_chain_id, remote_api, wallet_cli );
     wapiptr->set_wallet_filename( wallet_file.generic_string() );
