@@ -35,7 +35,9 @@
 #include <fc/network/http/websocket.hpp>
 #include <fc/network/url.hpp>
 #include <fc/rpc/cli.hpp>
+#include <fc/rpc/api_connection.hpp>
 #include <fc/rpc/http_api.hpp>
+#include <fc/rpc/websocket_api.hpp>
 #include <fc/smart_ref_impl.hpp>
 
 #include <hive/utilities/key_conversion.hpp>
@@ -68,10 +70,18 @@ namespace bpo = boost::program_options;
 
 namespace
 {
-  std::shared_ptr< fc::http::client > get_client_type( const std::string& _url_str, const std::string& server_auth = std::string{} )
+  std::shared_ptr< fc::api_connection > get_api_connection( const fc::url& _url, fc::http::connection_ptr& con )
   {
-    fc::url _url{ _url_str };
+    if( _url.proto().substr( 0, 2 ) == "ws" )
+      return std::make_shared< fc::rpc::websocket_api_connection >( static_cast< fc::http::websocket_connection& >( *con ) );
+    else if( _url.proto().substr( 0, 4 ) == "http" )
+      return std::make_shared< fc::rpc::http_api_connection >( static_cast< fc::http::http_connection& >( *con ) );
+    else
+      FC_ASSERT( false, "Unsupported protocol: ${proto}", ("proto", _url.proto()) );
+  }
 
+  std::shared_ptr< fc::http::client > get_client_type( const fc::url& _url, const std::string& server_auth = std::string{} )
+  {
     if( _url.proto() == "ws" )
       return std::make_shared< fc::http::websocket_client >();
     else if( _url.proto() == "wss" )
@@ -189,11 +199,11 @@ int main( int argc, char** argv )
     if( !options.at("server-rpc-endpoint").defaulted() )
       wdata.ws_server = options.at("server-rpc-endpoint").as<std::string>();
 
-    auto client = get_client_type( wdata.ws_server, options["cert-authority"].as<std::string>() );
+    fc::url server{ wdata.ws_server };
+
+    auto client = get_client_type( server, options["cert-authority"].as<std::string>() );
     idump((wdata.ws_server));
     fc::http::connection_ptr con;
-
-    fc::url server{ wdata.ws_server };
 
     for (;;)
     {
@@ -217,7 +227,7 @@ int main( int argc, char** argv )
 
     auto wallet_cli = std::make_shared<fc::rpc::cli>();
 
-    auto apic = std::make_shared< fc::rpc::http_api_connection >(*con);
+    auto apic = get_api_connection( server, con );
     auto remote_api = apic->get_remote_api< hive::plugins::wallet_bridge_api::wallet_bridge_api >(0, "wallet_bridge_api");
     auto wapiptr = std::make_shared<wallet_api>( wdata, _hive_chain_id, remote_api, wallet_cli );
     wapiptr->set_wallet_filename( wallet_file.generic_string() );
